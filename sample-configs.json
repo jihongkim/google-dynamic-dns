@@ -1,0 +1,12 @@
+{
+	"domain": "xxxxxxxxxx",
+	"google": {
+		"username": "xxxxxxxxxx",
+		"password": "xxxxxxxxxx"
+	},
+	"ipinfo": {
+		"key": "xxxxxxxxxx",
+		"url": "https://ipinfo.io"
+	},
+	"myip": ""
+}
