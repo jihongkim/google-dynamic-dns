@@ -3,8 +3,8 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -64,7 +64,12 @@ func main() {
 }
 
 func handleError(message string, err error) {
-	fmt.Println(message, err)
+	file, _ := os.OpenFile("errors.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+
+	defer file.Close()
+
+	log.SetOutput(file)
+	log.Println(message, `-`, err)
 }
 
 func loadConfigs() (Configs, error) {
