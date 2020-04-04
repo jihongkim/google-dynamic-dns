@@ -64,7 +64,44 @@ func main() {
 }
 
 func handleError(message string, err error) {
-	fmt.Println(err)
+	fmt.Println(message, err)
+}
+
+func loadConfigs() (Configs, error) {
+	var configs Configs
+
+	file, err := os.Open("configs.json")
+	if err != nil {
+		return configs, errors.New(`Please verify that configs.json file exists`)
+	}
+
+	jsonParser := json.NewDecoder(file)
+	if err = jsonParser.Decode(&configs); err != nil {
+		return configs, errors.New(`Please verify that configs.json is a valid json file`)
+	}
+
+	return configs, nil
+}
+
+func hasIPChanged(configs Configs) (bool, Configs, error) {
+	response, err := http.Get(configs.IPInfo.URL + "/ip?token=" + configs.IPInfo.Key)
+	if err != nil {
+		return false, configs, errors.New(`Could not connect to ipinfo.io`)
+	}
+	defer response.Body.Close()
+
+	bodyBytes, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return false, configs, errors.New(`Weird body returned from ipinfo.io`)
+	}
+
+	myip := strings.TrimSpace(string(bodyBytes))
+	if myip != configs.MyIP {
+		configs.MyIP = myip
+		return true, configs, nil
+	}
+
+	return false, configs, nil
 }
 
 func buildURL(configs Configs) string {
@@ -78,43 +115,60 @@ func buildURL(configs Configs) string {
 
 func updateDNS(configs Configs) (bool, error) {
 	apiURL := buildURL(configs)
-	return true, nil
-}
 
-func hasIPChanged(configs Configs) (bool, Configs, error) {
-	response, err := http.Get(configs.IPInfo.URL + "/ip?token=" + configs.IPInfo.Key)
+	request, err := http.NewRequest(`POST`, apiURL, nil)
 	if err != nil {
-		return false, configs, errors.New("Could not connect to ipinfo.io")
+		return false, errors.New(`Could not connect to Google Domains`)
+	}
+	request.Header.Set(`User-Agent`, `Dynamic-DNS-Updater`)
+
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return false, errors.New("Could not connect to godaddy.com")
 	}
 	defer response.Body.Close()
 
 	bodyBytes, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return false, configs, errors.New("Weird body returned from ipinfo.io")
+		return false, errors.New("Weird body returned from godaddy.com")
 	}
 
-	myip := strings.TrimSpace(string(bodyBytes))
-	if myip != configs.MyIP {
-		configs.MyIP = myip
-		return true, configs, nil
-	}
-
-	fmt.Println("Nothing to update")
-	return false, configs, nil
+	responseBody := strings.TrimSpace(string(bodyBytes))
+	return parseResponse(responseBody)
 }
 
-func loadConfigs() (Configs, error) {
-	var configs Configs
-
-	file, err := os.Open("configs.json")
-	if err != nil {
-		return configs, errors.New("Please verify that configs.json file exists")
+func parseResponse(response string) (bool, error) {
+	if strings.Contains(response, `nochg`) {
+		return false, nil
 	}
 
-	jsonParser := json.NewDecoder(file)
-	if err = jsonParser.Decode(&configs); err != nil {
-		return configs, errors.New("Please verify that configs.json is a valid json file")
+	if strings.Contains(response, `nohost`) {
+		return false, errors.New(`The hostname does not exist, or does not have Dynamic DNS enabled`)
 	}
 
-	return configs, nil
+	if strings.Contains(response, `badauth`) {
+		return false, errors.New(`The username / password combination is not valid for the specified host`)
+	}
+
+	if strings.Contains(response, `notfqdn`) {
+		return false, errors.New(`The supplied hostname is not a valid fully-qualified domain name`)
+	}
+
+	if strings.Contains(response, `badagent`) {
+		return false, errors.New(`Your Dynamic DNS client is making bad requests. Ensure the user agent is set in the request`)
+	}
+
+	if strings.Contains(response, `abuse`) {
+		return false, errors.New(`Dynamic DNS access for the hostname has been blocked due to failure to interpret previous responses correctly`)
+	}
+
+	if strings.Contains(response, `911`) {
+		return false, errors.New(`An error happened on our end. Wait 5 minutes and retry`)
+	}
+
+	if strings.Contains(response, `conflict A`) {
+		return false, errors.New(`A custom A or AAAA resource record conflicts with the update. Delete the indicated resource record within DNS settings page and try the update again`)
+	}
+
+	return true, nil
 }
