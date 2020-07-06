@@ -129,13 +129,13 @@ func updateDNS(configs Configs) (bool, error) {
 
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
-		return false, errors.New("Could not connect to godaddy.com")
+		return false, errors.New("Could not connect to Google Domains")
 	}
 	defer response.Body.Close()
 
 	bodyBytes, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return false, errors.New("Weird body returned from godaddy.com")
+		return false, errors.New("Weird body returned from Google Domains")
 	}
 
 	responseBody := strings.TrimSpace(string(bodyBytes))
