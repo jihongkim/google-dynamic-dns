@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -23,58 +22,7 @@ type Configs struct {
 	MyIP string `json:"myip"`
 }
 
-func main() {
-	configs, err := loadConfigs()
-	if err != nil {
-		handleError(`Failed to load configs`, err)
-		return
-	}
-
-	hasIPChanged, configs, err := hasIPChanged(configs)
-	if err != nil {
-		handleError(`Failed to check if IP has changed`, err)
-		return
-	}
-
-	if !hasIPChanged {
-		return
-	}
-
-	updatedDNS, err := updateDNS(configs)
-	if err != nil {
-		handleError(`Failed to update DNS`, err)
-		return
-	}
-
-	if !updatedDNS {
-		return
-	}
-
-	file, err := json.MarshalIndent(configs, "", "	")
-	if err != nil {
-		handleError(`Failed to generate file`, err)
-		return
-	}
-
-	err = ioutil.WriteFile("configs.json", file, 0644)
-	if err != nil {
-		handleError(`Failed to write the new IP to the json file`, err)
-		return
-	}
-}
-
-func handleError(message string, err error) {
-	file, _ := os.OpenFile("errors.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-
-	defer file.Close()
-
-	log.SetOutput(file)
-	log.Println(message, `-`, err)
-}
-
-func loadConfigs() (Configs, error) {
-	var configs Configs
-
+func (configs Configs) loadConfigs() (Configs, error) {
 	file, err := os.Open("configs.json")
 	if err != nil {
 		return configs, errors.New(`Please verify that configs.json file exists`)
@@ -88,28 +36,28 @@ func loadConfigs() (Configs, error) {
 	return configs, nil
 }
 
-func hasIPChanged(configs Configs) (bool, Configs, error) {
+func (configs Configs) hasIPChanged() (bool, error) {
 	response, err := http.Get(configs.IPInfo.URL + "/ip?token=" + configs.IPInfo.Key)
 	if err != nil {
-		return false, configs, errors.New(`Could not connect to ipinfo.io`)
+		return false, errors.New(`Could not connect to ipinfo.io`)
 	}
 	defer response.Body.Close()
 
 	bodyBytes, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return false, configs, errors.New(`Weird body returned from ipinfo.io`)
+		return false, errors.New(`Weird body returned from ipinfo.io`)
 	}
 
 	myip := strings.TrimSpace(string(bodyBytes))
 	if myip != configs.MyIP {
 		configs.MyIP = myip
-		return true, configs, nil
+		return true, nil
 	}
 
-	return false, configs, nil
+	return false, nil
 }
 
-func buildURL(configs Configs) string {
+func (configs Configs) buildURL() string {
 	// Refer to the following page for more information on the API:
 	// https://support.google.com/domains/answer/6147083?hl=en
 	url := `https://` + configs.Google.Username + `:` + configs.Google.Password
@@ -118,8 +66,8 @@ func buildURL(configs Configs) string {
 	return url
 }
 
-func updateDNS(configs Configs) (bool, error) {
-	apiURL := buildURL(configs)
+func (configs Configs) updateDNS() (bool, error) {
+	apiURL := configs.buildURL()
 
 	request, err := http.NewRequest(`POST`, apiURL, nil)
 	if err != nil {
@@ -139,10 +87,10 @@ func updateDNS(configs Configs) (bool, error) {
 	}
 
 	responseBody := strings.TrimSpace(string(bodyBytes))
-	return parseResponse(responseBody)
+	return configs.parseResponse(responseBody)
 }
 
-func parseResponse(response string) (bool, error) {
+func (configs Configs) parseResponse(response string) (bool, error) {
 	if strings.Contains(response, `nochg`) {
 		return false, nil
 	}
