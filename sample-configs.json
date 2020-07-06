@@ -8,5 +8,6 @@
 		"key": "xxxxxxxxxx",
 		"url": "https://ipinfo.io"
 	},
-	"myip": ""
+	"myip": "",
+	"mode" : "p"
 }

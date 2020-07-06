@@ -8,7 +8,9 @@ import (
 )
 
 func main() {
-	configs, err := Configs{}.loadConfigs()
+	configs := Configs{}
+
+	err := configs.loadConfigs()
 	if err != nil {
 		handleError(`Failed to load configs`, err)
 		return

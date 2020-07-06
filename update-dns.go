@@ -20,24 +20,29 @@ type Configs struct {
 		URL string `json:"url"`
 	} `json:"ipinfo"`
 	MyIP string `json:"myip"`
+	Mode string `json:"mode"`
 }
 
-func (configs Configs) loadConfigs() (Configs, error) {
-	file, err := os.Open("configs.json")
+func (configs *Configs) loadConfigs() error {
+	file, err := os.Open(`configs.json`)
 	if err != nil {
-		return configs, errors.New(`Please verify that configs.json file exists`)
+		return errors.New(`Please verify that configs.json file exists`)
 	}
 
 	jsonParser := json.NewDecoder(file)
 	if err = jsonParser.Decode(&configs); err != nil {
-		return configs, errors.New(`Please verify that configs.json is a valid json file`)
+		return errors.New(`Please verify that configs.json is a valid json file`)
 	}
 
-	return configs, nil
+	if configs.isDevMode() {
+		configs.MyIP = `Test IP Address`
+	}
+
+	return nil
 }
 
-func (configs Configs) hasIPChanged() (bool, error) {
-	response, err := http.Get(configs.IPInfo.URL + "/ip?token=" + configs.IPInfo.Key)
+func (configs *Configs) hasIPChanged() (bool, error) {
+	response, err := http.Get(configs.IPInfo.URL + `/ip?token=` + configs.IPInfo.Key)
 	if err != nil {
 		return false, errors.New(`Could not connect to ipinfo.io`)
 	}
@@ -57,7 +62,7 @@ func (configs Configs) hasIPChanged() (bool, error) {
 	return false, nil
 }
 
-func (configs Configs) buildURL() string {
+func (configs *Configs) buildURL() string {
 	// Refer to the following page for more information on the API:
 	// https://support.google.com/domains/answer/6147083?hl=en
 	url := `https://` + configs.Google.Username + `:` + configs.Google.Password
@@ -66,8 +71,12 @@ func (configs Configs) buildURL() string {
 	return url
 }
 
-func (configs Configs) updateDNS() (bool, error) {
+func (configs *Configs) updateDNS() (bool, error) {
 	apiURL := configs.buildURL()
+
+	if configs.isDevMode() {
+		return configs.parseResponse(`test`)
+	}
 
 	request, err := http.NewRequest(`POST`, apiURL, nil)
 	if err != nil {
@@ -77,20 +86,20 @@ func (configs Configs) updateDNS() (bool, error) {
 
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
-		return false, errors.New("Could not connect to Google Domains")
+		return false, errors.New(`Could not connect to Google Domains`)
 	}
 	defer response.Body.Close()
 
 	bodyBytes, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return false, errors.New("Weird body returned from Google Domains")
+		return false, errors.New(`Weird body returned from Google Domains`)
 	}
 
 	responseBody := strings.TrimSpace(string(bodyBytes))
 	return configs.parseResponse(responseBody)
 }
 
-func (configs Configs) parseResponse(response string) (bool, error) {
+func (configs *Configs) parseResponse(response string) (bool, error) {
 	if strings.Contains(response, `nochg`) {
 		return false, nil
 	}
@@ -124,4 +133,12 @@ func (configs Configs) parseResponse(response string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func (configs *Configs) isDevMode() bool {
+	if configs.Mode == `dev` {
+		return true
+	}
+
+	return false
 }
