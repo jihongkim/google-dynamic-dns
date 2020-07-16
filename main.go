@@ -5,12 +5,21 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 )
+
+var configsPath string
 
 func main() {
 	configs := Configs{}
 
-	err := configs.loadConfigs()
+	absolutePath, err := filepath.Abs(`./configs.json`)
+	if err != nil {
+		handleError(`Failed to grab the absolute filepath for configs.json`, err)
+	}
+	configsPath = absolutePath
+
+	err = configs.loadConfigs()
 	if err != nil {
 		handleError(`Failed to load configs`, err)
 		return
@@ -50,7 +59,12 @@ func main() {
 }
 
 func handleError(message string, err error) {
-	file, _ := os.OpenFile("errors.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	errorsPath, errPath := filepath.Abs(`./errors.log`)
+	if errPath != nil {
+		err = errPath
+	}
+
+	file, _ := os.OpenFile(errorsPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 
 	defer file.Close()
 

@@ -24,7 +24,7 @@ type Configs struct {
 }
 
 func (configs *Configs) loadConfigs() error {
-	file, err := os.Open(`configs.json`)
+	file, err := os.Open(configsPath)
 	if err != nil {
 		return errors.New(`Please verify that configs.json file exists`)
 	}
