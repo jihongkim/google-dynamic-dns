@@ -5,21 +5,14 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"path/filepath"
+	"runtime"
+	"strings"
 )
-
-var configsPath string
 
 func main() {
 	configs := Configs{}
 
-	absolutePath, err := filepath.Abs(`./configs.json`)
-	if err != nil {
-		handleError(`Failed to grab the absolute filepath for configs.json`, err)
-	}
-	configsPath = absolutePath
-
-	err = configs.loadConfigs()
+	err := configs.loadConfigs()
 	if err != nil {
 		handleError(`Failed to load configs`, err)
 		return
@@ -51,7 +44,7 @@ func main() {
 		return
 	}
 
-	err = ioutil.WriteFile("configs.json", file, 0644)
+	err = ioutil.WriteFile(getAbsolutePath(`configs.json`), file, 0644)
 	if err != nil {
 		handleError(`Failed to write the new IP to the json file`, err)
 		return
@@ -59,15 +52,16 @@ func main() {
 }
 
 func handleError(message string, err error) {
-	errorsPath, errPath := filepath.Abs(`./errors.log`)
-	if errPath != nil {
-		err = errPath
-	}
-
-	file, _ := os.OpenFile(errorsPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	file, _ := os.OpenFile(getAbsolutePath(`errors.log`), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 
 	defer file.Close()
 
 	log.SetOutput(file)
 	log.Println(message, `-`, err)
+}
+
+func getAbsolutePath(filename string) string {
+	_, absolutePath, _, _ := runtime.Caller(0)
+	absolutePath = absolutePath[:strings.LastIndex(absolutePath, `/`)+1]
+	return absolutePath + filename
 }
