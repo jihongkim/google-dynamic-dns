@@ -75,7 +75,7 @@ func (configs *Configs) updateDNS() (bool, error) {
 	apiURL := configs.buildURL()
 
 	if configs.isDevMode() {
-		return configs.parseResponse(`test`)
+		return parseResponse(`test`)
 	}
 
 	request, err := http.NewRequest(`POST`, apiURL, nil)
@@ -96,10 +96,10 @@ func (configs *Configs) updateDNS() (bool, error) {
 	}
 
 	responseBody := strings.TrimSpace(string(bodyBytes))
-	return configs.parseResponse(responseBody)
+	return parseResponse(responseBody)
 }
 
-func (configs *Configs) parseResponse(response string) (bool, error) {
+func parseResponse(response string) (bool, error) {
 	if strings.Contains(response, `nochg`) {
 		return false, nil
 	}
